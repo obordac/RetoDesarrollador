@@ -1,0 +1,254 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Seguimiento vacunacion Covid-19</title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.21/esri/themes/light/main.css" />
+  <script src="https://js.arcgis.com/4.21/"></script>
+    
+    <style>
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    
+    #viewDiv {
+      height: 55%;
+      width: 100%;
+    }
+    
+     #zoom {
+      margin-bottom: 5px;
+    }
+    
+    #actions {
+      padding: 5px;
+    }
+    .container {
+      height: 45%;
+      width: 100%;
+    }
+    </style>  
+     
+     
+    <script>
+      require([
+        "esri/config",
+        "esri/WebMap",
+         "esri/core/watchUtils",
+        "esri/Map", 
+        "esri/layers/FeatureLayer",
+        "esri/widgets/FeatureTable",
+        "esri/views/MapView",
+        "esri/widgets/ScaleBar",
+        "esri/widgets/Legend"
+
+      ], function (esriConfig,WebMap, watchUtils,Map,FeatureLayer,FeatureTable,MapView,ScaleBar,Legend) {
+         
+esriConfig.apiKey = "AAPK996efc1766d94aee93e80f6deed5cb1eL0gRhWzTQkByu6hfk2Wq7Gw5TSYyHj-btLugKENVih3gAZ5NnaBS8Jum51DOLvbr";
+         
+        const features = [];
+        const webmap = new WebMap({
+        portalItem: {
+          id: "85629dff00984699af3a9ef9087e3df8"
+        }
+      });            
+               
+ 
+        
+        const view = new MapView({
+          container: "viewDiv",
+          map: webmap,
+          center: [-74.110103, 4.656581], // Longitude, latitude
+          zoom: 10, // Zoom level
+          popup: {
+          autoOpenEnabled: false
+                  }
+        });
+                
+        const scalebar = new ScaleBar({
+        view: view
+      });
+
+      view.ui.add(scalebar, "bottom-left");
+        
+            const legend = new Legend ({
+        view: view
+      });
+      view.ui.add(legend, "top-right");
+        
+        
+           view.when(() => {
+        const featureLayer = webmap.layers.getItemAt(1); //grabs the first layer in the map
+        featureLayer.title = "Informacion Vacunados";
+
+        // Create the feature table
+        const featureTable = new FeatureTable({
+          view: view, // required for feature highlight to work
+          layer: featureLayer,
+          // Autocast the FieldColumnConfigs
+          fieldConfigs: [{
+              name: "ciudad_de_residencia",
+              label: "Municipio",
+              direction: "asc"
+           
+            },
+            {
+              name: "localidad",
+              label: "Nombre Localidad"
+            },
+            {
+              name: "direccion",
+              label: "Direccion"
+            },
+            {
+              name: "genero",
+              label: "Genero"
+            },
+            {
+              name: "edad",
+              label: "Edad"
+            },                         
+            {
+              name: "ocupacion",
+              label: "Ocupacion"
+            },                         
+             {
+              name: "facultad",
+              label: "Facultad"
+            },                          
+            {
+              name: "caso_confirmado",
+              label: "Casos Confirmados"
+            },
+            {
+              name: "caso_activo",
+              label: "Casos Activos"
+            },
+            {
+              name: "vacuando",
+              label: "Personas Vacunadas"
+            },
+            {
+              name: "esquema",
+              label: "Dosis"
+            },
+            {
+              name: "laboratorio",
+              label: "Tipo de vacuna que tiene"
+            },                    
+            {
+              name: "presencialidad",
+              label: "Respuesta de presencialidad"
+            }
+          ],
+          container:
+        
+        document.getElementById("tableDiv")
+        });
+        
+ view.ui.add(document.getElementById("actions"), "top-right");
+    
+       featureLayer.watch("loaded", () => {
+       watchUtils.whenFalse(view, "updating", () =>  {
+        
+       if (view.extent) {
+        featureTable.filterGeometry = view.extent;
+            }
+          });
+        });
+             
+     featureTable.on("selection-change", (changes) => {         
+     changes.removed.forEach((item) => {
+            const data = features.find((data) => {
+              return data.feature === item.feature;
+            });
+            if (data) {
+              features.splice(features.indexOf(data), 1);
+            }
+          });
+      
+                 changes.added.forEach((item) => {
+            const feature = item.feature;
+            features.push({
+              feature: feature
+            });
+          });
+        });
+             
+     view.on("immediate-click", (event) => {
+          view.hitTest(event).then((response) => {
+            const candidate = response.results.find((result) => {
+              return result.graphic && result.graphic.layer && result.graphic.layer === featureLayer;
+            });
+            // Select the rows of the clicked feature
+            candidate && featureTable.selectRows(candidate.graphic);
+          });
+        });
+             
+          const zoomBtn = document.getElementById("zoom");
+          const fullExtentBtn = document.getElementById("fullextent");
+ 
+  zoomBtn.addEventListener("click", zoomToSelectedFeature);
+          fullExtentBtn.addEventListener("click", fullExtent);
+  
+           function zoomToSelectedFeature() {
+              const query = featureLayer.createQuery();
+ 
+  const featureIds = features.map((result) => {
+              return result.feature.getAttribute(featureLayer.objectIdField);
+            });
+  query.objectIds = featureIds;
+             
+  query.returnGeometry = true;
+             
+  featureLayer.queryFeatures(query).then((results) => {
+              view.goTo(results.features)
+              .catch((error) => {
+                if (error.name != "AbortError"){
+                  console.error(error);
+                }
+              });
+            });
+          }
+     function fullExtent() {
+       view.goTo(featureLayer.fullExtent)
+            .catch((error) => {
+              if (error.name != "AbortError"){
+                console.error(error);
+              }
+            });
+          }
+      });
+    });
+  
+    </script>
+    
+
+  </head>
+  <body>
+    <div id="viewDiv"></div>
+    <div class="container">
+      <div id="tableDiv"></div>
+    </div>
+    <div id="actions" class="esri-widget">
+      <button class="esri-button" id="zoom">Zoom to selected feature(s)</button>
+      <button class="esri-button" id="fullextent">Full extent</button>
+  </div>
+    
+    <script>
+      window.onload =() => {
+        document.getElementById('obtenerUrl').addEventListener('click',function(){
+          let url = document.URL;
+
+          document.getElementById('viewDiv').innerText = url;
+        });
+      }
+      
+    </script>
+  </body>
+</html> 
